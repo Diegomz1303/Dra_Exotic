@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PawPrint, User, Phone, Plus, Loader2, Feather, Cat, Search, Trash2, Pencil, X, Hash, Leaf, Clock, MapPin, Bone, Activity } from "lucide-react";
+import { PawPrint, User, Phone, Plus, Loader2, Feather, Cat, Search, Trash2, Pencil, X, Hash, Leaf, Clock, MapPin, Bone, Activity, FileText, CheckCircle2, Stethoscope } from "lucide-react";
 import { insforge } from "@/servicios/insforge";
 import { toast } from "sonner";
 
@@ -18,6 +18,53 @@ export default function PacientesPage() {
 
   // Estado del Nuevo Modal
   const [mostrarModalForm, setMostrarModalForm] = useState(false);
+
+  // Estado de Historial Clínico
+  const [modalHistorial, setModalHistorial] = useState<any>(null);
+  const [citasHistorial, setCitasHistorial] = useState<any[]>([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  const [limiteHistorial, setLimiteHistorial] = useState(5);
+  const [tieneMasHistorial, setTieneMasHistorial] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
+
+  const abrirHistorial = async (paciente: any) => {
+    setModalHistorial(paciente);
+    setCitasHistorial([]);
+    setLimiteHistorial(5);
+    setCargandoHistorial(true);
+    const { data, count } = await insforge.database.from("citas")
+      .select("*", { count: 'exact' })
+      .eq("mascota", paciente.nombre)
+      .eq("estado", "Completada")
+      .order("fecha", { ascending: false })
+      .range(0, 4);
+    
+    if (data) {
+      setCitasHistorial(data);
+      if (count && count > 5) setTieneMasHistorial(true);
+      else setTieneMasHistorial(false);
+    }
+    setCargandoHistorial(false);
+  };
+
+  const cargarMasHistorial = async () => {
+    setCargandoMas(true);
+    const nextLimit = limiteHistorial + 5;
+    const { data, count } = await insforge.database.from("citas")
+      .select("*", { count: 'exact' })
+      .eq("mascota", modalHistorial.nombre)
+      .eq("estado", "Completada")
+      .order("fecha", { ascending: false })
+      .range(0, nextLimit - 1);
+    
+    if (data) {
+      setCitasHistorial(data);
+      setLimiteHistorial(nextLimit);
+      if (count && count > nextLimit) setTieneMasHistorial(true);
+      else setTieneMasHistorial(false);
+    }
+    setCargandoMas(false);
+  };
 
   // Formulario Común
   const [numeroHistorial, setNumeroHistorial] = useState("");
@@ -212,6 +259,9 @@ export default function PacientesPage() {
                     className={`bg-white rounded-[1.5rem] p-6 border shadow-[0_4px_20px_rgba(0,0,0,0.015)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.04)] transition-all group relative flex flex-col h-full ${editandoId === paciente.id ? 'border-teal-200 bg-teal-50/20' : 'border-[#fcfcfd]'}`}
                   >
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex gap-2">
+                       <button onClick={() => abrirHistorial(paciente)} className="w-8 h-8 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-50 hover:text-blue-500 transition-colors bg-white/80 backdrop-blur-sm shadow-sm" title="Ver Expediente Médico">
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
                       <button onClick={() => iniciarEdicion(paciente)} className="w-8 h-8 rounded-full flex items-center justify-center text-teal-300 hover:bg-teal-50 hover:text-teal-500 transition-colors bg-white/80 backdrop-blur-sm shadow-sm" title="Editar">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
@@ -431,6 +481,89 @@ export default function PacientesPage() {
                 <button onClick={ejecutarEliminacion} className="w-full py-3.5 px-4 rounded-xl text-rose-500 bg-rose-50 hover:bg-rose-100 font-medium text-sm transition-colors shadow-sm">Sí, borrar</button>
                 <button onClick={() => setPacienteAEliminar(null)} className="w-full py-3.5 px-4 rounded-xl text-[#a0a0b2] bg-white hover:bg-slate-50 border border-slate-100 font-medium text-sm transition-colors">Cancelar</button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Modal Historial */}
+      <AnimatePresence>
+        {modalHistorial && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[500] bg-[#3b3a62]/30 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white/95 backdrop-blur-3xl rounded-[2.5rem] p-8 md:p-10 max-w-2xl w-full h-[85vh] md:h-[80vh] flex flex-col shadow-[0_30px_100px_rgba(59,58,98,0.2)] border border-[#fcfcfd] relative overflow-hidden">
+               <button onClick={() => setModalHistorial(null)} className="absolute top-6 right-6 w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 hover:bg-rose-50 text-[#a0a0b2] hover:text-rose-500 transition-colors z-[600]"><X className="w-5 h-5"/></button>
+               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400 rounded-full mix-blend-multiply filter blur-[80px] opacity-10 translate-x-1/2 -translate-y-1/3 pointer-events-none"></div>
+
+               <div className="flex items-center gap-4 mb-8 shrink-0 relative z-10">
+                 <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center border border-blue-100">
+                   <FileText className="w-6 h-6 text-blue-500" />
+                 </div>
+                 <div>
+                   <h3 className="text-[#3b3a62] font-medium text-2xl">Expediente Clínico</h3>
+                   <p className="text-[13px] text-[#a0a0b2] font-light mt-0.5">Historial médico de <strong className="text-blue-500 font-medium">{modalHistorial.nombre}</strong></p>
+                 </div>
+               </div>
+
+               <div className="flex-1 overflow-y-auto pr-2 space-y-6 relative z-10">
+                  {cargandoHistorial ? (
+                     <div className="flex flex-col items-center justify-center h-40 text-[#a0a0b2]"><Loader2 className="w-8 h-8 animate-spin text-blue-400 opacity-50 mb-3"/> Buscando archivos...</div>
+                  ) : citasHistorial.length === 0 ? (
+                     <div className="text-center p-12 text-[#a0a0b2] font-light italic">No hay registros completados para este paciente.</div>
+                  ) : (
+                     <div className="border-l-2 border-slate-100/60 ml-4 pl-6 space-y-10 py-4">
+                        {citasHistorial.map((cita) => (
+                           <div key={cita.id} className="relative group">
+                              <div className="absolute -left-[35px] top-1.5 w-4 h-4 rounded-full bg-white border-4 border-blue-400 group-hover:scale-125 transition-transform shadow-sm"></div>
+                              <div className="bg-white rounded-2xl p-5 md:p-6 border border-slate-100 shadow-[0_4px_15px_rgba(0,0,0,0.015)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.03)] transition-all">
+                                 <div className="flex items-center justify-between mb-4">
+                                    <div className="text-[12px] font-bold text-[#a0a0b2] uppercase tracking-wider bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">{cita.fecha.split('-').reverse().join('/')} a las {cita.hora.split(' ')[0]}</div>
+                                    <div className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5"/> Cita OK</div>
+                                 </div>
+                                 <h4 className="text-[#3b3a62] font-medium text-lg mb-4 flex items-center gap-2 border-b border-slate-50 pb-4"><Stethoscope className="w-4 h-4 text-blue-400"/> {cita.tipo}</h4>
+                                 
+                                 {cita.diagnostico && (
+                                   <div className="mb-4">
+                                     <h5 className="text-[11px] font-bold text-[#a0a0b2] uppercase tracking-wider mb-1.5">Diagnóstico Médico</h5>
+                                     <p className="text-[14px] leading-relaxed text-[#3b3a62] font-light bg-slate-50 p-4 rounded-xl border border-slate-100/50">{cita.diagnostico}</p>
+                                   </div>
+                                 )}
+                                 
+                                 {cita.tratamiento && (
+                                   <div className="mb-5">
+                                     <h5 className="text-[11px] font-bold text-[#a0a0b2] uppercase tracking-wider mb-1.5">Tratamiento / Receta</h5>
+                                     <p className="text-[14px] leading-relaxed text-[#3b3a62] font-light bg-emerald-50/30 p-4 rounded-xl border border-emerald-100/50">{cita.tratamiento}</p>
+                                   </div>
+                                 )}
+
+                                 {(cita.archivos && cita.archivos.length > 0) && (
+                                   <div className="pt-2 border-t border-slate-50">
+                                     <h5 className="text-[11px] font-bold text-[#a0a0b2] uppercase tracking-wider mb-3">Archivos Adjuntos (PDFs / Análisis)</h5>
+                                     <div className="flex flex-wrap gap-2">
+                                       {cita.archivos.map((arc: any, idx: number) => {
+                                          const urlPublica = arc.url?.startsWith('http') ? arc.url : `${process.env.NEXT_PUBLIC_INSFORGE_URL}/storage/v1/object/public/historial/${arc.url || arc.key}`;
+                                          return (
+                                            <a key={idx} href={urlPublica} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 bg-blue-50/50 hover:bg-blue-100 text-blue-600 border border-blue-100/50 hover:border-blue-200 text-[12px] font-medium rounded-xl flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+                                               {arc.tipo && arc.tipo.includes('pdf') ? <FileText className="w-4 h-4"/> : <Activity className="w-4 h-4"/>}
+                                               {arc.nombre || `Documento ${idx+1}`}
+                                            </a>
+                                          )
+                                       })}
+                                     </div>
+                                   </div>
+                                 )}
+                              </div>
+                           </div>
+                        ))}
+                        {tieneMasHistorial && (
+                           <div className="pt-4 flex justify-center">
+                              <button onClick={cargarMasHistorial} disabled={cargandoMas} className="bg-white border border-slate-200 text-[#a0a0b2] font-medium text-[13px] px-6 py-2.5 rounded-full hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50">
+                                 {cargandoMas ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>}
+                                 Cargar expedientes anteriores
+                              </button>
+                           </div>
+                        )}
+                     </div>
+                  )}
+               </div>
             </motion.div>
           </motion.div>
         )}

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { Toaster, toast } from 'sonner';
 import { useRouter } from "next/navigation";
+import { signIn } from "@/app/actions/auth";
 
 export default function PaginaInicio() {
   const [cargando, setCargando] = useState(false);
@@ -16,16 +17,27 @@ export default function PaginaInicio() {
     e.preventDefault();
     setCargando(true);
     
-    // MOCK LOGIN: Por ahora admite cualquier cosa y redirige al Dashboard
-    setTimeout(() => {
-      setCargando(false);
-      toast.success('¡Bienvenida, Dra Exotic!', {
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+
+    const result = await signIn(formData);
+    
+    setCargando(false);
+
+    if (!result?.success) {
+      toast.error(result?.error || "Error al iniciar sesión", {
         position: 'top-center',
-        style: { borderRadius: '100px', padding: '16px', fontSize: '14px', background: '#fc855f', color: 'white', border: 'none' }
+        style: { borderRadius: '100px', padding: '16px', fontSize: '14px', background: '#ff4d4f', color: 'white', border: 'none' }
       });
-      // Navegar suavemente al dashboard
-      router.push('/dashboard');
-    }, 1500);
+      return;
+    }
+
+    toast.success('¡Bienvenida, Dra Exotic!', {
+      position: 'top-center',
+      style: { borderRadius: '100px', padding: '16px', fontSize: '14px', background: '#fc855f', color: 'white', border: 'none' }
+    });
+    router.push('/dashboard');
   };
 
   return (
