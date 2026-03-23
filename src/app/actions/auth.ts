@@ -1,6 +1,6 @@
 'use server'
 
-import { createInsForgeServerClient, setAuthCookies, clearAuthCookies } from '@/servicios/insforge-server'
+import { createInsForgeServerClient, setAuthCookies, clearAuthCookies } from '@/lib/insforge-server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 
@@ -32,37 +32,57 @@ export async function signOut() {
 
 export async function getUserProfile() {
   const cookieStore = await cookies();
-  const token = cookieStore.get("sb-access-token")?.value;
+  const token = cookieStore.get("insforge_access_token")?.value;
   if (!token) return null;
-  const res = await fetch(`${process.env.NEXT_PUBLIC_INSFORGE_URL}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY as string }
-  });
-  if (!res.ok) return null;
-  return await res.json();
+  
+  try {
+    const insforge = createInsForgeServerClient(token);
+    // Usamos 'as any' porque el linter puede no tener la definición más reciente, 
+    // pero la skill confirma que es el método correcto.
+    const { data, error } = await (insforge.auth as any).getCurrentSession();
+    
+    if (error) {
+      console.warn("getUserProfile SDK error:", error.message);
+      return null;
+    }
+    
+    return data?.session?.user ?? data?.user ?? null;
+  } catch (error) {
+    console.error("getUserProfile fatal error:", error);
+    return null;
+  }
 }
 
 export async function updateProfileInfo(nombre_clinica: string) {
   const cookieStore = await cookies();
-  const token = cookieStore.get("sb-access-token")?.value;
+  const token = cookieStore.get("insforge_access_token")?.value;
   if (!token) return { error: "No autenticado" };
-  const res = await fetch(`${process.env.NEXT_PUBLIC_INSFORGE_URL}/auth/v1/user`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY as string, "Content-Type": "application/json" },
-    body: JSON.stringify({ data: { nombre_clinica } })
-  });
-  if (!res.ok) return { error: "Error al actualizar" };
-  return { success: true };
+  
+  try {
+    const insforge = createInsForgeServerClient(token);
+    const { data, error } = await (insforge.auth as any).setProfile({
+      nombre_clinica
+    });
+    
+    if (error) return { error: error.message };
+    return { success: true, data };
+  } catch (error) {
+    return { error: "Error de conexión" };
+  }
 }
 
 export async function updateUserPassword(password: string) {
   const cookieStore = await cookies();
-  const token = cookieStore.get("sb-access-token")?.value;
+  const token = cookieStore.get("insforge_access_token")?.value;
   if (!token) return { error: "No autenticado" };
-  const res = await fetch(`${process.env.NEXT_PUBLIC_INSFORGE_URL}/auth/v1/user`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, apikey: process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY as string, "Content-Type": "application/json" },
-    body: JSON.stringify({ password })
-  });
-  if (!res.ok) return { error: "Error al cambiar contraseña" };
-  return { success: true };
+  
+  try {
+    const insforge = createInsForgeServerClient(token);
+    const { error } = await (insforge.auth as any).updateUser({ password });
+    
+    if (error) return { error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { error: "Error al actualizar contraseña" };
+  }
 }

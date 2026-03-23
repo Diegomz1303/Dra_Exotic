@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar as CalendarIcon, Clock, Plus, Loader2, PawPrint, User, Stethoscope, ChevronLeft, ChevronRight, X, AlertTriangle, FileText, CheckCircle2, AlertCircle } from "lucide-react";
-import { insforge } from "@/servicios/insforge";
+import { Calendar as CalendarIcon, Clock, Plus, Loader2, User, Stethoscope, ChevronLeft, ChevronRight, X, AlertTriangle, FileText, CheckCircle2 } from "lucide-react";
+import { insforge } from "@/lib/insforge";
 import { toast } from "sonner";
+import type { Cita } from "@/types";
+import ModalBase from "@/components/ModalBase";
+import PetAutocomplete from "@/components/PetAutocomplete";
+import TimePickerInput from "@/components/TimePickerInput";
 
 export default function CalendarioPage() {
-  const [citas, setCitas] = useState<any[]>([]);
+  const [citas, setCitas] = useState<Cita[]>([]);
   const [cargando, setCargando] = useState(true);
 
   const [fechaActual, setFechaActual] = useState(new Date());
@@ -24,12 +28,8 @@ export default function CalendarioPage() {
   const [amPm, setAmPm] = useState("AM");
   const [enviando, setEnviando] = useState(false);
 
-  // Autocompletado Mascota
-  const [sugerenciasPacientes, setSugerenciasPacientes] = useState<any[]>([]);
-  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
-
   // Modal Detalle Cita
-  const [citaSeleccionada, setCitaSeleccionada] = useState<any>(null);
+  const [citaSeleccionada, setCitaSeleccionada] = useState<Cita | null>(null);
 
   const prevMonth = () => setFechaActual(new Date(fechaActual.getFullYear(), fechaActual.getMonth() - 1, 1));
   const nextMonth = () => setFechaActual(new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 1));
@@ -37,8 +37,20 @@ export default function CalendarioPage() {
   useEffect(() => {
     async function cargarCitas() {
       setCargando(true);
-      const { data, error } = await insforge.database.from("citas").select('*').order('hora', { ascending: true });
-      if (!error && data) setCitas(data);
+      const firstDay = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
+      const lastDay = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0);
+      
+      const startDate = firstDay.toISOString().split('T')[0];
+      const endDate = lastDay.toISOString().split('T')[0];
+
+      const { data, error } = await insforge.database
+        .from("citas")
+        .select('*')
+        .gte('fecha', startDate)
+        .lte('fecha', endDate)
+        .order('hora', { ascending: true });
+        
+      if (!error && data) setCitas(data as Cita[]);
       setCargando(false);
     }
     cargarCitas();
@@ -48,28 +60,6 @@ export default function CalendarioPage() {
   const daysInMonth = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0).getDate();
   const startDay = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1).getDay();
 
-  const handleMascotaChange = async (val: string) => {
-    setMascota(val);
-    if (!val || val.length < 2) {
-      setSugerenciasPacientes([]);
-      setMostrarSugerencias(false);
-      return;
-    }
-    const { data } = await insforge.database.from("pacientes").select("id, nombre, dueno, especie").ilike("nombre", `%${val}%`).limit(5);
-    if (data && data.length > 0) {
-      setSugerenciasPacientes(data);
-      setMostrarSugerencias(true);
-    } else {
-      setMostrarSugerencias(false);
-    }
-  };
-
-  const seleccionarPaciente = (p: any) => {
-    setMascota(p.nombre);
-    setDueno(p.dueno);
-    setMostrarSugerencias(false);
-  };
-
   const agendarCitaDesdeCalendario = (dia: number) => {
     const jsDate = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), dia);
     const isoDate = new Date(jsDate.getTime() - jsDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
@@ -78,7 +68,7 @@ export default function CalendarioPage() {
     setMostrarModalForm(true);
   };
 
-  const guardarCita = async (e: any) => {
+  const guardarCita = async (e: React.FormEvent) => {
     e.preventDefault();
     setEnviando(true);
     const stringHora = `${horaSeleccionada}:${minutoSeleccionado} ${amPm}`;
@@ -90,11 +80,11 @@ export default function CalendarioPage() {
       toast.success("Turno agendado visualmente.");
       setMostrarModalForm(false);
       const { data } = await insforge.database.from("citas").select('*').order('hora', { ascending: true });
-      if (data) setCitas(data);
+      if (data) setCitas(data as Cita[]);
     }
   };
 
-  const verDetalle = (e: any, cita: any) => {
+  const verDetalle = (e: React.MouseEvent, cita: Cita) => {
     e.stopPropagation();
     setCitaSeleccionada(cita);
   };
@@ -207,70 +197,48 @@ export default function CalendarioPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL MÁGICO DE AGENDAMIENTO */}
-      <AnimatePresence>
-         {mostrarModalForm && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[300] bg-[#3b3a62]/30 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-               <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-white/95 backdrop-blur-2xl rounded-[2rem] p-6 md:p-10 w-full max-w-[500px] shadow-[0_20px_80px_rgba(252,133,95,0.25)] border border-[#fff4f1] relative my-8">
-                  <button onClick={() => setMostrarModalForm(false)} className="absolute top-6 right-6 w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 hover:bg-rose-50 text-[#a0a0b2] hover:text-rose-500 transition-colors z-[350]"><X className="w-5 h-5" strokeWidth={2} /></button>
-                  <div className="flex items-center gap-4 mb-8">
-                    <div className="w-14 h-14 rounded-[1.2rem] bg-[#fff4f1] flex items-center justify-center shadow-sm"><CalendarIcon className="w-6 h-6 text-[#fc855f]" /></div>
-                    <div>
-                      <h3 className="text-[#3b3a62] font-medium text-xl md:text-2xl">Cita el {fechaSeleccionada.split('-').reverse().join('/')}</h3>
-                      <p className="text-[13px] text-[#a0a0b2] font-light mt-0.5">La fecha ya está preseleccionada</p>
-                    </div>
-                  </div>
-                  <form onSubmit={guardarCita} className="space-y-6">
-                     <div className="relative group overflow-visible">
-                       <input type="text" required value={mascota} onChange={(e) => handleMascotaChange(e.target.value)} onFocus={() => {if(sugerenciasPacientes.length > 0) setMostrarSugerencias(true)}} onBlur={() => setTimeout(() => setMostrarSugerencias(false), 200)} className="w-full h-11 bg-transparent border-b border-[#ffd1c3] focus:outline-none focus:border-[#fc855f] text-[#fc855f] pl-9 text-[15px]" placeholder="Nombre Mascota" autoComplete="off" />
-                       <PawPrint className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#fc855f]/50" />
-                       <AnimatePresence>
-                        {mostrarSugerencias && sugerenciasPacientes.length > 0 && (
-                          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="absolute top-12 left-0 w-full bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_15px_40px_rgba(252,133,95,0.15)] border border-[#fff4f1] z-[120] overflow-hidden">
-                            {sugerenciasPacientes.map(p => (
-                              <div key={p.id} onClick={() => seleccionarPaciente(p)} className="px-4 py-3 cursor-pointer hover:bg-[#fff4f1]/80 border-b border-[#fff4f1]/50 last:border-0 flex items-center justify-between">
-                                <div><p className="text-[#3b3a62] text-[14px] font-medium leading-none mb-1.5">{p.nombre}</p><p className="text-[#a0a0b2] text-[11px] font-light leading-none">Dueño: {p.dueno}</p></div>
-                                <span className="text-[10px] bg-[#fc855f]/10 text-[#fc855f] px-2 py-0.5 rounded-full font-medium">{p.especie}</span>
-                              </div>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                     </div>
-                     <div className="relative group">
-                       <input type="text" required value={dueno} onChange={(e) => setDueno(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#ffd1c3] focus:outline-none focus:border-[#fc855f] text-[#fc855f] pl-9 text-[15px]" placeholder="Dueño" />
-                       <User className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#fc855f]/50" />
-                     </div>
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1">Hora Exacta</label>
-                         <div className="flex bg-slate-50 rounded-xl overflow-hidden shadow-sm border border-slate-100">
-                           <input type="number" min="1" max="12" value={horaSeleccionada} onChange={(e) => setHoraSeleccionada(e.target.value)} className="w-1/3 h-11 bg-transparent text-center focus:outline-none text-[#fc855f]" />
-                           <span className="py-2 text-[#a0a0b2] flex items-center">:</span>
-                           <input type="number" min="0" max="59" value={minutoSeleccionado} onChange={(e) => setMinutoSeleccionado(e.target.value)} className="w-1/3 h-11 bg-transparent text-center focus:outline-none text-[#fc855f]" />
-                           <select value={amPm} onChange={(e) => setAmPm(e.target.value)} className="w-1/3 h-11 bg-transparent text-[#fc855f] text-xs font-bold cursor-pointer"><option>AM</option><option>PM</option></select>
-                         </div>
-                       </div>
-                       <div>
-                          <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1 opacity-0">Tipo</label>
-                          <div className="relative group mt-1">
-                            <input type="text" required value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#ffd1c3] focus:outline-none focus:border-[#fc855f] text-[#fc855f] pl-9 text-[15px]" placeholder="Motivo" />
-                            <Stethoscope className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#fc855f]/50" />
-                          </div>
-                       </div>
-                     </div>
-                     <div className="relative group mt-6 bg-[#fff4f1]/30 p-4 rounded-xl border border-[#ffd1c3]/30">
-                        <label className="text-[11px] uppercase tracking-wider text-[#fc855f] font-semibold mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5"/> Notas (opcional)</label>
-                        <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className="w-full bg-transparent outline-none text-[14px] text-[#3b3a62]" placeholder="Observaciones médicas..."/>
-                     </div>
-                     <button type="submit" disabled={enviando} className="w-full rounded-2xl text-white font-medium text-[16px] h-14 bg-gradient-to-r from-[#fc855f] to-[#ff9770] disabled:opacity-50 mt-8 shadow-[0_8px_20px_rgba(252,133,95,0.3)] hover:shadow-[0_12px_25px_rgba(252,133,95,0.4)] transition-all">
-                       {enviando ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : "Agendar y Ver en Calendario"}
-                     </button>
-                  </form>
-               </motion.div>
-            </motion.div>
-         )}
-      </AnimatePresence>
+      {/* MODAL DE AGENDAMIENTO */}
+      <ModalBase open={mostrarModalForm} onClose={() => setMostrarModalForm(false)}>
+        <div className="flex items-center gap-4 mb-8 relative z-10">
+          <div className="w-14 h-14 rounded-[1.2rem] bg-[#fff4f1] flex items-center justify-center shadow-sm"><CalendarIcon className="w-6 h-6 text-[#fc855f]" /></div>
+          <div>
+            <h3 className="text-[#3b3a62] font-medium text-xl md:text-2xl">Cita el {fechaSeleccionada.split('-').reverse().join('/')}</h3>
+            <p className="text-[13px] text-[#a0a0b2] font-light mt-0.5">La fecha ya está preseleccionada</p>
+          </div>
+        </div>
+        <form onSubmit={guardarCita} className="space-y-6 relative z-10">
+          <PetAutocomplete
+            value={mascota}
+            onChange={setMascota}
+            onSelectPet={(nombre, duenoName) => { setMascota(nombre); setDueno(duenoName); }}
+            placeholder="Nombre Mascota"
+          />
+          <div className="relative group">
+            <input type="text" required value={dueno} onChange={(e) => setDueno(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#ffd1c3] focus:outline-none focus:border-[#fc855f] text-[#fc855f] pl-9 text-[15px]" placeholder="Dueño" />
+            <User className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#fc855f]/50" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1">Hora Exacta</label>
+              <TimePickerInput hora={horaSeleccionada} minuto={minutoSeleccionado} amPm={amPm} onHoraChange={setHoraSeleccionada} onMinutoChange={setMinutoSeleccionado} onAmPmChange={setAmPm} />
+            </div>
+            <div>
+              <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1 opacity-0">Tipo</label>
+              <div className="relative group mt-1">
+                <input type="text" required value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#ffd1c3] focus:outline-none focus:border-[#fc855f] text-[#fc855f] pl-9 text-[15px]" placeholder="Motivo" />
+                <Stethoscope className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#fc855f]/50" />
+              </div>
+            </div>
+          </div>
+          <div className="relative group mt-6 bg-[#fff4f1]/30 p-4 rounded-xl border border-[#ffd1c3]/30">
+            <label className="text-[11px] uppercase tracking-wider text-[#fc855f] font-semibold mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5"/> Notas (opcional)</label>
+            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className="w-full bg-transparent outline-none text-[14px] text-[#3b3a62]" placeholder="Observaciones médicas..."/>
+          </div>
+          <button type="submit" disabled={enviando} className="w-full rounded-2xl text-white font-medium text-[16px] h-14 bg-gradient-to-r from-[#fc855f] to-[#ff9770] disabled:opacity-50 mt-8 shadow-[0_8px_20px_rgba(252,133,95,0.3)] hover:shadow-[0_12px_25px_rgba(252,133,95,0.4)] transition-all">
+            {enviando ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : "Agendar y Ver en Calendario"}
+          </button>
+        </form>
+      </ModalBase>
     </>
   );
 }
