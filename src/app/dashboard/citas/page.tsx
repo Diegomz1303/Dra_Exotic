@@ -47,6 +47,8 @@ export default function CitasPage() {
   const [modalConsulta, setModalConsulta] = useState<Cita | null>(null);
   const [diagnostico, setDiagnostico] = useState("");
   const [tratamiento, setTratamiento] = useState("");
+  const [observaciones, setObservaciones] = useState("");
+  const [recomendaciones, setRecomendaciones] = useState("");
   const [archivosSeleccionados, setArchivosSeleccionados] = useState<File[]>([]);
   const [subiendoConsulta, setSubiendoConsulta] = useState(false);
 
@@ -110,7 +112,7 @@ export default function CitasPage() {
     if (nuevoEstado === 'Pendiente') {
       cambiarEstadoDirecto(cita.id, nuevoEstado);
     } else if (nuevoEstado === 'Completada') {
-      setDiagnostico(""); setTratamiento(""); setArchivosSeleccionados([]);
+      setDiagnostico(""); setTratamiento(""); setObservaciones(""); setRecomendaciones(""); setArchivosSeleccionados([]);
       setModalConsulta(cita);
     } else {
       setEstadoAConfirmar({ ...cita, accion: nuevoEstado });
@@ -182,6 +184,8 @@ export default function CitasPage() {
       estado: 'Completada',
       diagnostico,
       tratamiento,
+      observaciones,
+      recomendaciones,
       archivos: archivosUrls
     }).eq("id", modalConsulta.id);
 
@@ -338,17 +342,28 @@ export default function CitasPage() {
 
         <form onSubmit={guardarConsulta} className="space-y-6 relative z-10">
            <div className="bg-teal-50/30 p-4 rounded-xl border border-teal-100/50">
-             <label className="text-[11px] uppercase tracking-wider text-teal-600 font-semibold mb-2 block ml-1 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5"/> Diagnóstico Médico</label>
-             <textarea required value={diagnostico} onChange={(e) => setDiagnostico(e.target.value)} rows={3} className="w-full bg-white rounded-lg p-3 text-[14px] text-[#3b3a62] border border-teal-100 focus:outline-none focus:border-teal-300 focus:ring-1 focus:ring-teal-300" placeholder="Describe los síntomas y el diagnóstico de la mascota..."></textarea>
+             <label className="text-[11px] uppercase tracking-wider text-teal-600 font-bold mb-2 block ml-1 flex items-center gap-1.5"><Stethoscope className="w-3.5 h-3.5"/> Procedimiento Realizado</label>
+             <textarea required value={diagnostico} onChange={(e) => setDiagnostico(e.target.value)} rows={3} className="w-full bg-white rounded-lg p-3 text-[14px] text-[#3b3a62] border border-teal-100 focus:outline-none focus:border-teal-300 focus:ring-1 focus:ring-teal-300" placeholder="Describe los síntomas y el procedimiento realizado..."></textarea>
            </div>
 
            <div className="bg-emerald-50/30 p-4 rounded-xl border border-emerald-100/50">
-             <label className="text-[11px] uppercase tracking-wider text-emerald-600 font-semibold mb-2 block ml-1 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5"/> Tratamiento / Receta</label>
+             <label className="text-[11px] uppercase tracking-wider text-emerald-600 font-bold mb-2 block ml-1 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5"/> Tratamiento / Receta</label>
              <textarea required value={tratamiento} onChange={(e) => setTratamiento(e.target.value)} rows={3} className="w-full bg-white rounded-lg p-3 text-[14px] text-[#3b3a62] border border-emerald-100 focus:outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-300" placeholder="Indica los medicamentos, dosis y pasos a seguir..."></textarea>
            </div>
 
-           <div className="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50">
-             <label className="text-[11px] uppercase tracking-wider text-blue-600 font-semibold mb-2 block ml-1 flex items-center gap-1.5"><UploadCloud className="w-3.5 h-3.5"/> Subir Análisis o PDF (Se comprime automático)</label>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-orange-50/30 p-4 rounded-xl border border-orange-100/50">
+                <label className="text-[11px] uppercase tracking-wider text-orange-600 font-bold mb-2 block ml-1 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5"/> Observaciones</label>
+                <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={3} className="w-full bg-white rounded-lg p-3 text-[14px] text-[#3b3a62] border border-orange-100 focus:outline-none focus:border-orange-300 focus:ring-1 focus:ring-orange-300" placeholder="Notas adicionales del paciente..."></textarea>
+              </div>
+              <div className="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50">
+                <label className="text-[11px] uppercase tracking-wider text-blue-600 font-bold mb-2 block ml-1 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5"/> Recomendaciones</label>
+                <textarea value={recomendaciones} onChange={(e) => setRecomendaciones(e.target.value)} rows={3} className="w-full bg-white rounded-lg p-3 text-[14px] text-[#3b3a62] border border-blue-100 focus:outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-300" placeholder="Pasos a seguir por el dueño..."></textarea>
+              </div>
+           </div>
+
+           <div className="bg-slate-50/40 p-4 rounded-xl border border-slate-100/50 text-[#3b3a62]">
+             <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-bold mb-2 block ml-1 flex items-center gap-1.5"><UploadCloud className="w-3.5 h-3.5"/> Subir Análisis o PDF (Se comprime automático)</label>
              <div className="relative w-full h-24 border-2 border-dashed border-blue-200 rounded-xl flex items-center justify-center bg-white hover:bg-blue-50 transition-colors cursor-pointer overflow-hidden">
                <input type="file" multiple accept=".pdf,image/jpeg,image/png" onChange={manejarArchivos} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" />
                <div className="text-center text-blue-400">

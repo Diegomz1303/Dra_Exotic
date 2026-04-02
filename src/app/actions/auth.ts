@@ -71,6 +71,24 @@ export async function updateProfileInfo(nombre_clinica: string) {
   }
 }
 
+export async function updateProfileFoto(foto_perfil: string) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("insforge_access_token")?.value;
+  if (!token) return { error: "No autenticado" };
+  
+  try {
+    const insforge = createInsForgeServerClient(token);
+    const { data, error } = await (insforge.auth as any).setProfile({
+      foto_perfil
+    });
+    
+    if (error) return { error: error.message };
+    return { success: true, data };
+  } catch (error) {
+    return { error: "Error de conexión" };
+  }
+}
+
 export async function updateUserPassword(password: string) {
   const cookieStore = await cookies();
   const token = cookieStore.get("insforge_access_token")?.value;

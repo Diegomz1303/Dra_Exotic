@@ -39,6 +39,8 @@ export interface Cita {
   estado: EstadoCita;
   diagnostico?: string;
   tratamiento?: string;
+  observaciones?: string;
+  recomendaciones?: string;
   archivos?: ArchivoAdjunto[];
   activa: boolean;
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar as CalendarIcon, Clock, Plus, Loader2, User, Stethoscope, ChevronLeft, ChevronRight, X, AlertTriangle, FileText, CheckCircle2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Plus, Loader2, User, Stethoscope, ChevronLeft, ChevronRight, X, AlertTriangle, FileText, CheckCircle2, Phone, Home, Pencil } from "lucide-react";
 import { insforge } from "@/lib/insforge";
 import { toast } from "sonner";
 import type { Cita } from "@/types";
@@ -22,6 +22,8 @@ export default function CalendarioPage() {
   const [mascota, setMascota] = useState("");
   const [dueno, setDueno] = useState("");
   const [tipo, setTipo] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [direccion, setDireccion] = useState("");
   const [notas, setNotas] = useState("");
   const [horaSeleccionada, setHoraSeleccionada] = useState("10");
   const [minutoSeleccionado, setMinutoSeleccionado] = useState("00");
@@ -64,7 +66,7 @@ export default function CalendarioPage() {
     const jsDate = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), dia);
     const isoDate = new Date(jsDate.getTime() - jsDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
     setFechaSeleccionada(isoDate);
-    setMascota(""); setDueno(""); setTipo(""); setNotas("");
+    setMascota(""); setDueno(""); setTelefono(""); setDireccion(""); setTipo(""); setNotas("");
     setMostrarModalForm(true);
   };
 
@@ -72,15 +74,28 @@ export default function CalendarioPage() {
     e.preventDefault();
     setEnviando(true);
     const stringHora = `${horaSeleccionada}:${minutoSeleccionado} ${amPm}`;
-    const datosCita = { mascota, dueno, fecha: fechaSeleccionada, hora: stringHora, tipo, notas, estado: 'Pendiente', activa: true };
-    const { error } = await insforge.database.from("citas").insert([datosCita]);
-    setEnviando(false);
-    if (error) toast.error("Error al agendar");
-    else {
-      toast.success("Turno agendado visualmente.");
-      setMostrarModalForm(false);
-      const { data } = await insforge.database.from("citas").select('*').order('hora', { ascending: true });
-      if (data) setCitas(data as Cita[]);
+    const datosCita = { mascota, dueno, telefono, direccion, fecha: fechaSeleccionada, hora: stringHora, tipo, notas, estado: 'Pendiente', activa: true };
+    
+    try {
+      const { error } = await insforge.database.from("citas").insert([datosCita]);
+      if (error) {
+        toast.error("Error al agendar");
+      } else {
+        toast.success("Cita agendada correctamente");
+        
+        // WhatsApp Redirect
+        const mensaje = `*¡Hola! Dra. Exotic le saluda!* 🐾✨%0A%0AConfirmamos la cita para *${mascota}*:%0A📅 *Fecha:* ${fechaSeleccionada.split('-').reverse().join('/')}%0A⏰ *Hora:* ${stringHora}%0A🏥 *Motivo:* ${tipo}%0A📍 *Dirección:* ${direccion}%0A%0A¡Le esperamos con mucho cariño! 🐾🦎`;
+        const waUrl = `https://wa.me/${telefono.replace(/\D/g, '')}?text=${mensaje}`;
+        window.open(waUrl, '_blank');
+        
+        setMostrarModalForm(false);
+        const { data } = await insforge.database.from("citas").select('*').order('hora', { ascending: true });
+        if (data) setCitas(data as Cita[]);
+      }
+    } catch (e) {
+      toast.error("Error de conexión");
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -199,43 +214,60 @@ export default function CalendarioPage() {
 
       {/* MODAL DE AGENDAMIENTO */}
       <ModalBase open={mostrarModalForm} onClose={() => setMostrarModalForm(false)}>
-        <div className="flex items-center gap-4 mb-8 relative z-10">
-          <div className="w-14 h-14 rounded-[1.2rem] bg-[#fff4f1] flex items-center justify-center shadow-sm"><CalendarIcon className="w-6 h-6 text-[#fc855f]" /></div>
+        <div className="flex items-center gap-4 mb-8 relative z-10 pr-12">
+          <div className="w-14 h-14 rounded-[1.2rem] bg-[#f4f7f0] flex items-center justify-center shadow-sm">
+            <CalendarIcon className="w-6 h-6 text-[#8DAA68]" />
+          </div>
           <div>
-            <h3 className="text-[#3b3a62] font-medium text-xl md:text-2xl">Cita el {fechaSeleccionada.split('-').reverse().join('/')}</h3>
-            <p className="text-[13px] text-[#a0a0b2] font-light mt-0.5">La fecha ya está preseleccionada</p>
+            <h3 className="text-[#3b3a62] font-medium text-2xl">Agendar Cita</h3>
+            <p className="text-[13px] text-[#a0a0b2] font-light mt-0.5">Reserva un espacio para el {fechaSeleccionada.split('-').reverse().join('/')}</p>
           </div>
         </div>
         <form onSubmit={guardarCita} className="space-y-6 relative z-10">
           <PetAutocomplete
             value={mascota}
             onChange={setMascota}
-            onSelectPet={(nombre, duenoName) => { setMascota(nombre); setDueno(duenoName); }}
-            placeholder="Nombre Mascota"
+            onSelectPet={(nombre, duenoName, tel, dir) => { 
+              setMascota(nombre); 
+              setDueno(duenoName);
+              setTelefono(tel);
+              setDireccion(dir);
+            }}
           />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative group">
+              <input type="text" required value={dueno} onChange={(e) => setDueno(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#eef2e8] focus:outline-none focus:border-[#8DAA68] text-[#8DAA68] pl-9 text-[15px]" placeholder="Nombre Dueño" />
+              <User className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8DAA68]/50" />
+            </div>
+            <div className="relative group">
+              <input type="tel" required value={telefono} onChange={(e) => setTelefono(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#eef2e8] focus:outline-none focus:border-[#8DAA68] text-[#8DAA68] pl-9 text-[15px]" placeholder="Teléfono" />
+              <Phone className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8DAA68]/50" />
+            </div>
+          </div>
           <div className="relative group">
-            <input type="text" required value={dueno} onChange={(e) => setDueno(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#ffd1c3] focus:outline-none focus:border-[#fc855f] text-[#fc855f] pl-9 text-[15px]" placeholder="Dueño" />
-            <User className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#fc855f]/50" />
+            <input type="text" value={direccion} onChange={(e) => setDireccion(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#eef2e8] focus:outline-none focus:border-[#8DAA68] text-[#8DAA68] pl-9 text-[15px]" placeholder="Dirección (Opcional)" />
+            <Home className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8DAA68]/50" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1">Hora Exacta</label>
-              <TimePickerInput hora={horaSeleccionada} minuto={minutoSeleccionado} amPm={amPm} onHoraChange={setHoraSeleccionada} onMinutoChange={setMinutoSeleccionado} onAmPmChange={setAmPm} />
+              <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1">Fecha (Bloqueada)</label>
+              <input type="date" disabled value={fechaSeleccionada} className="w-full h-11 bg-slate-50 border-none rounded-xl px-4 text-[#8DAA68] text-sm opacity-60 cursor-not-allowed" />
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1 opacity-0">Tipo</label>
-              <div className="relative group mt-1">
-                <input type="text" required value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#ffd1c3] focus:outline-none focus:border-[#fc855f] text-[#fc855f] pl-9 text-[15px]" placeholder="Motivo" />
-                <Stethoscope className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#fc855f]/50" />
-              </div>
+              <label className="text-[11px] uppercase tracking-wider text-[#a0a0b2] font-semibold mb-2 block ml-1">Hora</label>
+              <TimePickerInput hora={horaSeleccionada} minuto={minutoSeleccionado} amPm={amPm} onHoraChange={setHoraSeleccionada} onMinutoChange={setMinutoSeleccionado} onAmPmChange={setAmPm} />
             </div>
           </div>
-          <div className="relative group mt-6 bg-[#fff4f1]/30 p-4 rounded-xl border border-[#ffd1c3]/30">
-            <label className="text-[11px] uppercase tracking-wider text-[#fc855f] font-semibold mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5"/> Notas (opcional)</label>
-            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className="w-full bg-transparent outline-none text-[14px] text-[#3b3a62]" placeholder="Observaciones médicas..."/>
+          <div className="relative group mt-2">
+            <input type="text" required value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full h-11 bg-transparent border-b border-[#eef2e8] focus:outline-none focus:border-[#8DAA68] text-[#8DAA68] pl-9 text-[15px]" placeholder="Motivo de Consulta (Ej. Vacunación)" />
+            <Stethoscope className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8DAA68]/50" />
           </div>
-          <button type="submit" disabled={enviando} className="w-full rounded-2xl text-white font-medium text-[16px] h-14 bg-gradient-to-r from-[#fc855f] to-[#ff9770] disabled:opacity-50 mt-8 shadow-[0_8px_20px_rgba(252,133,95,0.3)] hover:shadow-[0_12px_25px_rgba(252,133,95,0.4)] transition-all">
-            {enviando ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : "Agendar y Ver en Calendario"}
+          <div className="relative group mt-6 bg-[#f4f7f0]/30 p-4 rounded-xl border border-[#eef2e8]/30">
+            <label className="text-[11px] uppercase tracking-wider text-[#8DAA68] font-semibold mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5"/> Condiciones / Notas</label>
+            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} className="w-full bg-transparent border-none focus:outline-none focus:ring-0 text-[#3b3a62] placeholder:text-[#c4c4c4] font-light text-[14px] resize-none" placeholder="Observaciones previas..." />
+          </div>
+          <button type="submit" disabled={enviando} className="w-full rounded-2xl text-white font-medium text-[16px] h-14 transition-all mt-8 flex items-center justify-center gap-2 border border-white/20 bg-gradient-to-r from-[#8DAA68] to-[#6b844b] shadow-[0_8px_20px_rgba(141,170,104,0.3)] hover:shadow-[0_12px_25px_rgba(141,170,104,0.4)] active:scale-95 disabled:opacity-70">
+            {enviando ? <Loader2 className="w-6 h-6 animate-spin" /> : "Guardar Turno y Ver en Calendario"}
           </button>
         </form>
       </ModalBase>

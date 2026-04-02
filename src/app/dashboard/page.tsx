@@ -14,22 +14,24 @@ import type { Cita, Recordatorio, AppointmentItemProps } from "@/types";
 const HOY = new Date().toISOString().split('T')[0];
 const CITAS_KEY = `citas:{"eq":["fecha","${HOY}"],"order":["hora",{"ascending":true}]}`;
 const PACIENTES_KEY = 'pacientes:{"select":"id","count":"exact"}';
-const RECORDATORIOS_KEY = 'recordatorios:{"eq":["activo",true],"order":["id",{"ascending":false}]}';
+const RECORDATORIOS_KEY = 'recordatorios:{"order":["id",{"ascending":false}]}';
+const CONSULTAS_COMPLETADAS_KEY = 'citas:{"eq":["estado","Completada"],"select":"id","count":"exact"}';
 
 export default function Dashboard() {
   const { data: citasData, isLoading: citasLoading } = useSWR(CITAS_KEY, fetcher);
   const { data: pacientesData, isLoading: pacientesLoading } = useSWR(PACIENTES_KEY, fetcher);
   const { data: recordatoriosData, isLoading: recordatoriosLoading } = useSWR(RECORDATORIOS_KEY, fetcher);
+  const { data: consultasData, isLoading: consultasLoading } = useSWR(CONSULTAS_COMPLETADAS_KEY, fetcher);
 
   const citas = (citasData || []) as Cita[];
   const recordatorios = (recordatoriosData || []) as Recordatorio[];
   
   const stats = useMemo(() => ({
     pacientes: pacientesData?.length || 0,
-    consultas: 128 // Placeholder
-  }), [pacientesData]);
+    consultas: consultasData?.length || 0
+  }), [pacientesData, consultasData]);
 
-  const cargando = citasLoading || pacientesLoading || recordatoriosLoading;
+  const cargando = citasLoading || pacientesLoading || recordatoriosLoading || consultasLoading;
 
   const [nombreDra, setNombreDra] = useState("Dra. Exotic");
   const [nuevoTexto, setNuevoTexto] = useState("");
@@ -43,7 +45,7 @@ export default function Dashboard() {
     e.preventDefault();
     if(!nuevoTexto.trim()) return;
     setCreando(true);
-    const nuevo = { texto: nuevoTexto.trim(), activo: true };
+    const nuevo = { texto: nuevoTexto.trim(), completado: false };
     const { error } = await insforge.database.from("recordatorios").insert([nuevo]);
     if(!error) {
        mutate(RECORDATORIOS_KEY);
